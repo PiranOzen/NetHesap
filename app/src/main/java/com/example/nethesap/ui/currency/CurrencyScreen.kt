@@ -9,29 +9,36 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SyncAlt
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.nethesap.domain.model.Currency
 import com.example.nethesap.ui.theme.DeepBlue
 import com.example.nethesap.ui.theme.LightBlue
-import java.util.Locale
 
 @Composable
 fun CurrencyScreen(
     modifier: Modifier = Modifier,
-    viewModel: CurrencyViewModel = hiltViewModel()
+    viewModel: CurrencyViewModel = hiltViewModel(),
+    onMenuClick: () -> Unit
 ) {
     val state = viewModel.state.value
 
@@ -54,20 +61,35 @@ fun CurrencyScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text(
-                                text = "Hoş Geldiniz",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.7f)
-                            )
-                            Text(
-                                text = "Net Hesap",
-                                style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.sp
-                                ),
-                                color = Color.White
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = onMenuClick,
+                                modifier = Modifier
+                                    .padding(end = 8.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color.White.copy(alpha = 0.1f))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Menu,
+                                    contentDescription = "Menu",
+                                    tint = Color.White
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "Hoş Geldiniz",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.White.copy(alpha = 0.7f)
+                                )
+                                Text(
+                                    text = "Net Hesap",
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp
+                                    ),
+                                    color = Color.White
+                                )
+                            }
                         }
                         IconButton(
                             onClick = { viewModel.getCurrencies() },
@@ -165,7 +187,10 @@ fun CurrencyScreen(
 
                 val otherCurrencies = state.currencies.filter { it.code !in listOf("USD", "EUR", "GBP") }
                 items(otherCurrencies) { currency ->
-                    CurrencyListItem(currency) {
+                    CurrencyListItem(
+                        currency = currency,
+                        isSelected = state.selectedCurrency?.code == currency.code
+                    ) {
                         viewModel.onCurrencySelect(currency)
                     }
                 }
@@ -177,6 +202,32 @@ fun CurrencyScreen(
 @Composable
 fun ConverterCard(state: CurrencyState, viewModel: CurrencyViewModel) {
     var isFocused by remember { mutableStateOf(false) }
+    
+    // İmleç pozisyonunu korumak için TextFieldValue kullanıyoruz
+    var textFieldValueState by remember { mutableStateOf(TextFieldValue(text = state.amount)) }
+
+    // ViewModel'den gelen değer değiştiğinde imleci koruyarak güncelle
+    LaunchedEffect(state.amount) {
+        if (state.amount != textFieldValueState.text) {
+            val oldText = textFieldValueState.text
+            val oldSelection = textFieldValueState.selection.end
+            
+            val digitsBeforeCursor = oldText.take(oldSelection).count { it.isDigit() || it == ',' }
+            
+            var newSelection = 0
+            var digitsFound = 0
+            for (char in state.amount) {
+                if (digitsFound == digitsBeforeCursor) break
+                if (char.isDigit() || char == ',') digitsFound++
+                newSelection++
+            }
+            
+            textFieldValueState = textFieldValueState.copy(
+                text = state.amount,
+                selection = TextRange(newSelection.coerceIn(0, state.amount.length))
+            )
+        }
+    }
     
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -210,8 +261,11 @@ fun ConverterCard(state: CurrencyState, viewModel: CurrencyViewModel) {
                         color = Color.Gray
                     )
                     OutlinedTextField(
-                        value = if (!isFocused && state.amount == "0") "" else state.amount,
-                        onValueChange = { viewModel.onAmountChange(it) },
+                        value = if (!isFocused && textFieldValueState.text == "0") textFieldValueState.copy(text = "") else textFieldValueState,
+                        onValueChange = { 
+                            textFieldValueState = it
+                            viewModel.onAmountChange(it.text) 
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .onFocusChanged { focusState ->
@@ -365,13 +419,20 @@ fun CurrencyCard(currency: Currency, isSelected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun CurrencyListItem(currency: Currency, onClick: () -> Unit) {
+fun CurrencyListItem(
+    currency: Currency,
+    isSelected: Boolean = false,
+    onClick: () -> Unit
+) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() },
-        color = Color.White,
-        shape = RoundedCornerShape(12.dp)
+            .clickable { onClick() }
+            .alpha(if (isSelected) 1f else 0.7f),
+        color = if (isSelected) Color(0xFFE3F2FD) else Color.White,
+        shape = RoundedCornerShape(12.dp),
+        border = if (isSelected) BorderStroke(1.dp, DeepBlue) else null,
+        shadowElevation = if (isSelected) 2.dp else 0.dp
     ) {
         Row(
             modifier = Modifier
@@ -383,14 +444,17 @@ fun CurrencyListItem(currency: Currency, onClick: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = currency.code,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                    modifier = Modifier.width(45.dp)
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Bold
+                    ),
+                    modifier = Modifier.width(45.dp),
+                    color = if (isSelected) DeepBlue else Color.Black
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = currency.name,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray,
+                    color = if (isSelected) DeepBlue.copy(alpha = 0.8f) else Color.Gray,
                     maxLines = 1
                 )
             }
@@ -398,11 +462,23 @@ fun CurrencyListItem(currency: Currency, onClick: () -> Unit) {
             Row {
                 Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 16.dp)) {
                     Text("Alış", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                    Text(currency.buyingPrice, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                    Text(
+                        text = currency.buyingPrice,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
+                        ),
+                        color = if (isSelected) Color(0xFF00796B) else Color.Black
+                    )
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Satış", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                    Text(currency.sellingPrice, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = DeepBlue)
+                    Text(
+                        text = currency.sellingPrice,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
+                        ),
+                        color = if (isSelected) DeepBlue else DeepBlue
+                    )
                 }
             }
         }

@@ -1,5 +1,6 @@
 package com.example.nethesap.di
 
+import com.example.nethesap.data.remote.CollectApi
 import com.example.nethesap.data.remote.TcmbApi
 import com.example.nethesap.data.repository.CurrencyRepositoryImpl
 import com.example.nethesap.domain.repository.CurrencyRepository
@@ -8,6 +9,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.converter.simplexml.SimpleXmlConverterFactory
 import javax.inject.Singleton
 
@@ -23,6 +25,16 @@ object AppModule {
             .addConverterFactory(SimpleXmlConverterFactory.create())
             .build()
             .create(TcmbApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideCollectApi(): CollectApi {
+        return Retrofit.Builder()
+            .baseUrl(CollectApi.BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(CollectApi::class.java)
     }
 
     @Provides

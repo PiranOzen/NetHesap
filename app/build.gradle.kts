@@ -54,6 +54,7 @@ dependencies {
 
     // Retrofit & Networking
     implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
     implementation(libs.retrofit.converter.simplexml) {
         exclude(group = "xpp3", module = "xpp3")
         exclude(group = "stax", module = "stax-api")
